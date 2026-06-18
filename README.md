@@ -45,6 +45,9 @@ const transport = createTransport<Store>({ url: 'ws://localhost:8137' });
 
 export const countAtom = transport.atom('count');
 export const commandAtom = transport.atom('command');
+
+// 接続状態を反映する読み取り専用 atom（'connecting' | 'open' | 'closed'）
+export const statusAtom = transport.statusAtom();
 ```
 
 `createTransport` は必須の options オブジェクトを 1 つ受け取る。主なオプション:

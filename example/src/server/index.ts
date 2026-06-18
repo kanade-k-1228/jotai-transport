@@ -7,6 +7,14 @@ const PORT = Number(process.env.PORT ?? 8137);
 
 const wss = createTransportServer<Store>(init, storeSchema, { port: PORT });
 
+wss.on('connection', (ws, req) => {
+  const addr = req.socket.remoteAddress ?? 'unknown';
+  console.log(`[connect] ${addr} (clients: ${wss.clients.size})`);
+  ws.on('close', () =>
+    console.log(`[disconnect] ${addr} (clients: ${wss.clients.size})`),
+  );
+});
+
 wss.on('listening', () =>
   console.log(`jotai-transport server listening on ws://localhost:${PORT}`),
 );
