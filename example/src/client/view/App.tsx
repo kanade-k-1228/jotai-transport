@@ -1,6 +1,6 @@
 import { useAtom } from 'jotai';
 import { Suspense } from 'react';
-import { commandAtom, countAtom } from '../state/state.ts';
+import { commandAtom, countAtom } from '../state.ts';
 
 const Count = () => {
   const [count, setCount] = useAtom(countAtom);
@@ -34,7 +34,7 @@ const Command = () => {
 
 export const App = () => (
   <div style={{ fontFamily: 'sans-serif', padding: 24, maxWidth: 480 }}>
-    <h1>jotai-sync demo</h1>
+    <h1>jotai-transport demo</h1>
     <p>サーバ経由でリアルタイムに同期します</p>
 
     <Suspense fallback={<p>loading count…</p>}>

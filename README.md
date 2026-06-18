@@ -1,21 +1,81 @@
 # jotai-transport
 
-サーバ上の単一 KV ストアを複数クライアントから閲覧・更新する
+サーバ上の単一オブジェクトストアを、複数の Jotai クライアントから WebSocket 経由で閲覧・更新するための実験的パッケージです。
+
+## 構成
+
+- `pkgs/jotai-transport-client`: Jotai atom を WebSocket に同期する公開パッケージ
+- `pkgs/jotai-transport-server`: JSON patch を検証してブロードキャストする公開パッケージ
+- `example`: 上記2パッケージを使う Vite + React + tsx のサンプルアプリ
+
+## 開発
+
+```sh
+pnpm install
+pnpm dev
+```
+
+`pnpm dev` は公開パッケージを先にビルドしてから、example の WebSocket サーバと Vite クライアントを起動します。別々に起動したい場合は次を使います。
+
+```sh
+pnpm server
+pnpm client
+```
+
+検証:
+
+```sh
+pnpm build
+pnpm check
+```
+
+## 使い方
+
+クライアント側:
+
+```ts
+import { createTransport } from 'jotai-transport-client';
+
+interface Store {
+  count: number;
+  command: string;
+}
+
+const transport = createTransport<Store>('ws://localhost:8137');
+
+export const countAtom = transport.atom('count');
+export const commandAtom = transport.atom('command');
+```
+
+サーバ側:
+
+```ts
+import { createTransportServer } from 'jotai-transport-server';
+import { z } from 'zod';
+
+interface Store {
+  count: number;
+  command: string;
+}
+
+const init: Store = {
+  count: 0,
+  command: '',
+};
+
+const storeSchema = z.object({
+  count: z.number(),
+  command: z.string(),
+});
+
+createTransportServer(init, storeSchema, { port: 8137 });
+```
+
+`jotai-transport-server` は Zod に直接依存せず、`.partial().safeParse()` を持つ Zod 互換のスキーマを受け取ります。
 
 ## 通信プロトコル
 
-このリポジトリでは、クライアントとサーバが WebSocket 上で JSON オブジェクトを送り合い、サーバ上の単一ストアを同期します。既定の接続先は `ws://localhost:8137` です。ブラウザクライアントは実行中ページのホスト名を使い、`ws://<hostname>:8137` に接続します。
-
-同期対象のストアは `@jotai-sync/schema` の `Store` 型で定義されています。
-
-```ts
-interface Store {
-  count: number
-  command: string
-}
-```
-
-### メッセージ形式
+クライアントとサーバは WebSocket 上で JSON オブジェクトを送り合い、サーバ上の単一ストアを同期します。既定の接続先は `ws://localhost:8137` です。ブラウザクライアントは実行中ページのホスト名を使い、`ws://<hostname>:8137` に接続できます。
 
 通信されるメッセージは UTF-8 の JSON 文字列です。内容は `Store` の一部を持つオブジェクト、つまり `Partial<Store>` です。
 
@@ -49,7 +109,7 @@ interface Store {
 
 1. クライアント側で `serverAtom` の値が更新されます。
 2. `Transport` は更新されたキーと値を `pending` に積み、同一 microtask 内の変更をひとつの JSON オブジェクトにまとめて送信します。
-3. サーバは受信 JSON を `storeSchema.partial()` で検証します。
+3. サーバは受信 JSON を `storeSchema.partial()` 相当のスキーマで検証します。
 4. 検証に成功したメッセージをサーバ上のストアへマージします。`Store` に存在しないキーは状態更新の対象外です。
 5. サーバは受理した更新内容を、送信元を含む全接続クライアントへブロードキャストします。
 
@@ -62,3 +122,12 @@ JSON としてパースできないメッセージ、または `Store` の型に
 クライアントは WebSocket が閉じられると 1 秒後に再接続します。再接続後は通常の接続時と同じく、サーバから現在のストア全体を受け取ります。
 
 このプロトコルには認証、認可、暗号化、永続化は含まれていません。必要な場合は WebSocket サーバの前段や `server` 呼び出し側で追加します。
+
+## 公開
+
+公開前に `pnpm build` を通してください。
+
+```sh
+pnpm --filter jotai-transport-client publish --access public
+pnpm --filter jotai-transport-server publish --access public
+```

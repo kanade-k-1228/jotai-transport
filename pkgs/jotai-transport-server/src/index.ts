@@ -1,9 +1,18 @@
-import { type ServerOptions, type WebSocket, WebSocketServer } from 'ws';
-import type { ZodType } from 'zod';
+import { type ServerOptions, WebSocket, WebSocketServer } from 'ws';
 
-export const server = <S extends object>(
+export type SafeParseResult<T> = { success: true; data: T } | { success: false };
+
+export interface PartialSchema<S extends object> {
+  safeParse(value: unknown): SafeParseResult<Partial<S>>;
+}
+
+export interface TransportSchema<S extends object> {
+  partial(): PartialSchema<S>;
+}
+
+export const createTransportServer = <S extends object>(
   init: S,
-  schema: ZodType<S> & { partial: () => ZodType<Partial<S>> },
+  schema: TransportSchema<S>,
   options?: ServerOptions,
 ): WebSocketServer => {
   const partial = schema.partial();
@@ -11,7 +20,7 @@ export const server = <S extends object>(
   const clients = new Set<WebSocket>();
 
   const sendTo = (ws: WebSocket, msg: Partial<S>) => {
-    if (ws.readyState === ws.OPEN) ws.send(JSON.stringify(msg));
+    if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(msg));
   };
 
   const wss = new WebSocketServer(options);
@@ -39,3 +48,5 @@ export const server = <S extends object>(
 
   return wss;
 };
+
+export { createTransportServer as server };
