@@ -1,0 +1,21 @@
+{
+  "name": "jotai-sync",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@11.1.1",
+  "scripts": {
+    "dev": "pnpm -r --parallel run dev",
+    "server": "pnpm --filter @jotai-sync/server run dev",
+    "client": "pnpm --filter @jotai-sync/client run dev",
+    "zod": "pnpm --filter @jotai-sync/schema run zod",
+    "verify": "pnpm --filter @jotai-sync/server run smoke",
+    "lint": "biome lint .",
+    "format": "biome format --write .",
+    "check": "biome check .",
+    "fix": "biome check --write ."
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.5.0"
+  }
+}
