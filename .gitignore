@@ -22,6 +22,10 @@ pnpm-debug.log*
 .vite/
 .cache/
 
+# Profiling output
+profiles/
+*.cpuprofile
+
 # Editor / OS
 .DS_Store
 *.swp
