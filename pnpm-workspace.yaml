@@ -1,0 +1,8 @@
+packages:
+  - 'pkgs/*'
+  - 'example'
+  - 'bench'
+onlyBuiltDependencies:
+  - esbuild
+allowBuilds:
+  esbuild: true
