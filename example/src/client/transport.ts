@@ -1,9 +1,9 @@
-import { createTransportClient } from 'jotai-transport';
+import { createTransport } from 'jotai-transport';
 import type { Store } from '../store.ts';
 
-const url = (port = 8137): string =>
+const url =
   typeof location !== 'undefined' && location.hostname
-    ? `ws://${location.hostname}:${port}`
-    : `ws://localhost:${port}`;
+    ? `ws://${location.hostname}:8173`
+    : `ws://localhost:8173`;
 
-export const transport = createTransportClient<Store>(url());
+export const transport = createTransport<Store>({ url });

@@ -1,6 +1,8 @@
-import { atom, type WritableAtom } from 'jotai';
+import { type Atom, atom, type WritableAtom } from 'jotai';
 
 export type StoreKey<S extends object> = Extract<keyof S, string>;
+
+export type Status = 'connecting' | 'open' | 'closed';
 
 export type SyncedAtom<S extends object, K extends StoreKey<S>> = WritableAtom<
   S[K] | Promise<S[K]>,
@@ -9,8 +11,9 @@ export type SyncedAtom<S extends object, K extends StoreKey<S>> = WritableAtom<
 >;
 
 export interface TransportOptions {
-  reconnectDelayMs?: number;
+  url: string | URL;
   webSocket?: typeof WebSocket;
+  reconnectDelayMs?: number;
 }
 
 const isObjectRecord = (value: unknown): value is Record<string, unknown> =>
@@ -23,25 +26,21 @@ export class Transport<S extends object> {
   private cache = new Map<string, unknown>();
   private listeners = new Map<string, Set<(value: unknown) => void>>();
   private pending: Partial<Record<StoreKey<S>, S[StoreKey<S>]>> = {};
-  private readonly reconnectDelayMs: number;
-  private readonly WebSocketImpl: typeof WebSocket;
+  private dirty = new Set<string>();
+  private dispatchQueued = false;
+  private status: Status = 'connecting';
+  private statusListeners = new Set<(status: Status) => void>();
 
-  constructor(
-    private readonly url: string | URL,
-    options: TransportOptions = {},
-  ) {
-    const WebSocketImpl = options.webSocket ?? globalThis.WebSocket;
-    if (!WebSocketImpl) {
+  constructor(private readonly options: TransportOptions) {
+    if (!(options.webSocket ?? globalThis.WebSocket)) {
       throw new Error('WebSocket is not available. Pass options.webSocket or run in a browser.');
     }
-    this.WebSocketImpl = WebSocketImpl;
-    this.reconnectDelayMs = options.reconnectDelayMs ?? 1000;
     this.connect();
   }
 
   atom<K extends StoreKey<S>>(key: K): SyncedAtom<S, K> {
     const base = atom<S[K] | Promise<S[K]>>(this.whenReady(key));
-    base.onMount = (setSelf) => this.subscribe(key, (value) => setSelf(value as S[K]));
+    base.onMount = (setSelf) => this.subscribe(key, setSelf as (value: unknown) => void);
     return atom(
       (get) => get(base),
       (get, set, update: S[K] | ((prev: S[K]) => S[K])) => {
@@ -55,34 +54,80 @@ export class Transport<S extends object> {
     );
   }
 
+  statusAtom(): Atom<Status> {
+    const base = atom(this.status);
+    base.onMount = (setSelf) => this.subscribeStatus((status) => setSelf(status));
+    return atom((get) => get(base));
+  }
+
   close() {
     this.shouldReconnect = false;
     this.ws?.close();
     this.ws = null;
+    this.setStatus('closed');
   }
 
   private connect() {
     if (!this.shouldReconnect) return;
 
-    const ws = new this.WebSocketImpl(this.url.toString());
+    this.setStatus('connecting');
+    const WebSocketImpl = this.options.webSocket ?? globalThis.WebSocket;
+    const ws = new WebSocketImpl(this.options.url.toString());
     this.ws = ws;
-    ws.onopen = () => this.flushPending();
+    ws.onopen = () => {
+      this.setStatus('open');
+      this.flushPending();
+    };
     ws.onmessage = (ev) => {
       const data = this.parseMessage(ev.data);
       if (!data) return;
-
-      for (const [key, value] of Object.entries(data)) {
-        this.cache.set(key, value);
-        this.listeners.get(key)?.forEach((fn) => {
-          fn(value);
-        });
+      for (const key in data) {
+        this.cache.set(key, data[key]);
+        this.dirty.add(key);
       }
+      this.queueDispatch();
     };
     ws.onclose = () => {
-      if (this.ws === ws) this.ws = null;
-      if (this.shouldReconnect) setTimeout(() => this.connect(), this.reconnectDelayMs);
+      if (this.ws === ws) {
+        this.ws = null;
+        this.setStatus('closed');
+      }
+      if (this.shouldReconnect)
+        setTimeout(() => this.connect(), this.options.reconnectDelayMs ?? 1000);
     };
     ws.onerror = () => ws.close();
+  }
+
+  private subscribeStatus(fn: (status: Status) => void): () => void {
+    this.statusListeners.add(fn);
+    fn(this.status);
+    return () => {
+      this.statusListeners.delete(fn);
+    };
+  }
+
+  private setStatus(status: Status) {
+    if (this.status === status) return;
+    this.status = status;
+    for (const fn of this.statusListeners) fn(status);
+  }
+
+  private queueDispatch() {
+    if (this.dispatchQueued) return;
+    this.dispatchQueued = true;
+    queueMicrotask(() => this.flushDispatch());
+  }
+
+  private flushDispatch() {
+    this.dispatchQueued = false;
+    if (this.dirty.size === 0) return;
+    const dirty = this.dirty;
+    this.dirty = new Set();
+    for (const key of dirty) {
+      const value = this.cache.get(key);
+      const fns = this.listeners.get(key);
+      if (fns) for (const fn of fns) fn(value);
+    }
   }
 
   private subscribe(key: string, fn: (value: unknown) => void): () => void {
@@ -123,7 +168,8 @@ export class Transport<S extends object> {
 
     if (Object.keys(payload).length === 0) return;
 
-    if (this.ws?.readyState !== this.WebSocketImpl.OPEN) {
+    const WebSocketImpl = this.options.webSocket ?? globalThis.WebSocket;
+    if (this.ws?.readyState !== WebSocketImpl.OPEN) {
       this.pending = { ...payload, ...this.pending };
       return;
     }
@@ -143,7 +189,5 @@ export class Transport<S extends object> {
   }
 }
 
-export const createTransportClient = <S extends object>(
-  url: string | URL,
-  options?: TransportOptions,
-): Transport<S> => new Transport<S>(url, options);
+export const createTransport = <S extends object>(options: TransportOptions): Transport<S> =>
+  new Transport<S>(options);

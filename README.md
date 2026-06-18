@@ -41,11 +41,20 @@ interface Store {
   command: string;
 }
 
-const transport = createTransport<Store>('ws://localhost:8137');
+const transport = createTransport<Store>({ url: 'ws://localhost:8137' });
 
 export const countAtom = transport.atom('count');
 export const commandAtom = transport.atom('command');
 ```
+
+`createTransport` は必須の options オブジェクトを 1 つ受け取る。主なオプション:
+
+- `url`（必須）: 接続先の WebSocket URL。
+- `webSocket`: WebSocket 実装の注入（既定 `globalThis.WebSocket`）。テストや非ブラウザ環境向け。
+- `reconnectDelayMs`（既定 1000）: 再接続までの待機時間。
+
+受信更新は microtask 単位でまとめられ、キーごとに最新値だけが反映される（高頻度更新で jotai 再計算・
+再描画を削減。同一ティック内の中間値は反映されない）。
 
 サーバ側:
 
@@ -112,6 +121,7 @@ createTransportServer(init, storeSchema, { port: 8137 });
 3. サーバは受信 JSON を `storeSchema.partial()` 相当のスキーマで検証します。
 4. 検証に成功したメッセージをサーバ上のストアへマージします。`Store` に存在しないキーは状態更新の対象外です。
 5. サーバは受理した更新内容を、送信元を含む全接続クライアントへブロードキャストします。
+6. 受信側クライアントは、同一 microtask 内に届いた更新をキーごとにまとめ、最新値だけを一度 Jotai atom へ反映します（中間値は反映されません）。
 
 同じキーに対して複数クライアントから同時に更新が届いた場合は、サーバが受信した順に適用され、最後に適用された値が現在値になります。ACK、履歴、バージョン番号、競合解決用のメタデータは持ちません。
 

@@ -1,6 +1,26 @@
-import { useAtom } from 'jotai';
+import { useAtom, useAtomValue } from 'jotai';
 import { Suspense } from 'react';
-import { commandAtom, countAtom } from '../state.ts';
+import { commandAtom, countAtom, statusAtom } from '../state.ts';
+
+const STATUS_LABEL = { connecting: '接続中…', open: '接続済み', closed: '切断' } as const;
+const STATUS_COLOR = { connecting: '#e0a800', open: '#28a745', closed: '#dc3545' } as const;
+
+const ConnectionStatus = () => {
+  const status = useAtomValue(statusAtom);
+  return (
+    <p style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#555' }}>
+      <span
+        style={{
+          width: 10,
+          height: 10,
+          borderRadius: '50%',
+          background: STATUS_COLOR[status],
+        }}
+      />
+      {STATUS_LABEL[status]}
+    </p>
+  );
+};
 
 const Count = () => {
   const [count, setCount] = useAtom(countAtom);
@@ -36,6 +56,7 @@ export const App = () => (
   <div style={{ fontFamily: 'sans-serif', padding: 24, maxWidth: 480 }}>
     <h1>jotai-transport demo</h1>
     <p>サーバ経由でリアルタイムに同期します</p>
+    <ConnectionStatus />
 
     <Suspense fallback={<p>loading count…</p>}>
       <Count />
