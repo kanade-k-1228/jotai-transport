@@ -1,4 +1,4 @@
-import { createTransportClient } from 'jotai-transport-client';
+import { createTransportClient } from 'jotai-transport';
 import type { Store } from '../store.ts';
 
 const url = (port = 8137): string =>

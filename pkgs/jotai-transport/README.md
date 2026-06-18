@@ -1,9 +1,9 @@
-# jotai-transport-client
+# jotai-transport
 
 Jotai atoms synchronized through a WebSocket transport.
 
 ```ts
-import { createTransport } from 'jotai-transport-client';
+import { createTransport } from 'jotai-transport';
 
 interface Store {
   count: number;
@@ -16,4 +16,4 @@ export const countAtom = transport.atom('count');
 export const commandAtom = transport.atom('command');
 ```
 
-Use with `jotai-transport-server` or any WebSocket server that sends and receives JSON `Partial<Store>` patches.
+Use with `transport-server` or any WebSocket server that sends and receives JSON `Partial<Store>` patches.

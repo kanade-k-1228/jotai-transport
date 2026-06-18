@@ -1,9 +1,9 @@
-# jotai-transport-server
+# transport-server
 
-WebSocket server for synchronizing an object store with `jotai-transport-client`.
+WebSocket server for synchronizing an object store with `jotai-transport`.
 
 ```ts
-import { createTransportServer } from 'jotai-transport-server';
+import { createTransportServer } from 'transport-server';
 import { z } from 'zod';
 
 interface Store {

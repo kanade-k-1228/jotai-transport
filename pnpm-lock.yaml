@@ -17,18 +17,18 @@ importers:
       jotai:
         specifier: ^2.10.0
         version: 2.20.1(@babel/core@7.29.7)(@babel/template@7.29.7)(@types/react@18.3.31)(react@18.3.1)
-      jotai-transport-client:
+      jotai-transport:
         specifier: workspace:*
-        version: link:../pkgs/jotai-transport-client
-      jotai-transport-server:
-        specifier: workspace:*
-        version: link:../pkgs/jotai-transport-server
+        version: link:../pkgs/jotai-transport
       react:
         specifier: ^18.3.1
         version: 18.3.1
       react-dom:
         specifier: ^18.3.1
         version: 18.3.1(react@18.3.1)
+      transport-server:
+        specifier: workspace:*
+        version: link:../pkgs/transport-server
       zod:
         specifier: ^3.24.1
         version: 3.25.76
@@ -61,7 +61,7 @@ importers:
         specifier: ^5.4.0
         version: 5.4.21(@types/node@22.19.21)
 
-  pkgs/jotai-transport-client:
+  pkgs/jotai-transport:
     devDependencies:
       jotai:
         specifier: ^2.10.0
@@ -70,7 +70,7 @@ importers:
         specifier: ^5.6.2
         version: 5.9.3
 
-  pkgs/jotai-transport-server:
+  pkgs/transport-server:
     dependencies:
       '@types/ws':
         specifier: ^8.5.12

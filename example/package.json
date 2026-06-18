@@ -15,8 +15,8 @@
   },
   "dependencies": {
     "jotai": "^2.10.0",
-    "jotai-transport-client": "workspace:*",
-    "jotai-transport-server": "workspace:*",
+    "jotai-transport": "workspace:*",
+    "transport-server": "workspace:*",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "zod": "^3.24.1"

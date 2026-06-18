@@ -1,11 +1,11 @@
 # jotai-transport
 
-サーバ上の単一オブジェクトストアを、複数の Jotai クライアントから WebSocket 経由で閲覧・更新するための実験的パッケージです。
+サーバ上の単一オブジェクトストアを、複数の Jotai クライアントから WebSocket 経由で閲覧・更新するためのパッケージです。
 
 ## 構成
 
-- `pkgs/jotai-transport-client`: Jotai atom を WebSocket に同期する公開パッケージ
-- `pkgs/jotai-transport-server`: JSON patch を検証してブロードキャストする公開パッケージ
+- `pkgs/jotai-transport`: Jotai atom を WebSocket に同期する公開パッケージ
+- `pkgs/transport-server`: JSON patch を検証してブロードキャストする公開パッケージ
 - `example`: 上記2パッケージを使う Vite + React + tsx のサンプルアプリ
 
 ## 開発
@@ -34,7 +34,7 @@ pnpm check
 クライアント側:
 
 ```ts
-import { createTransport } from 'jotai-transport-client';
+import { createTransport } from 'jotai-transport';
 
 interface Store {
   count: number;
@@ -50,7 +50,7 @@ export const commandAtom = transport.atom('command');
 サーバ側:
 
 ```ts
-import { createTransportServer } from 'jotai-transport-server';
+import { createTransportServer } from 'transport-server';
 import { z } from 'zod';
 
 interface Store {
@@ -71,7 +71,7 @@ const storeSchema = z.object({
 createTransportServer(init, storeSchema, { port: 8137 });
 ```
 
-`jotai-transport-server` は Zod に直接依存せず、`.partial().safeParse()` を持つ Zod 互換のスキーマを受け取ります。
+`transport-server` は Zod に直接依存せず、`.partial().safeParse()` を持つ Zod 互換のスキーマを受け取ります。
 
 ## 通信プロトコル
 
@@ -128,6 +128,6 @@ JSON としてパースできないメッセージ、または `Store` の型に
 公開前に `pnpm build` を通してください。
 
 ```sh
-pnpm --filter jotai-transport-client publish --access public
-pnpm --filter jotai-transport-server publish --access public
+pnpm --filter jotai-transport publish --access public
+pnpm --filter transport-server publish --access public
 ```

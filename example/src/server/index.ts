@@ -1,4 +1,4 @@
-import { createTransportServer } from 'jotai-transport-server';
+import { createTransportServer } from 'transport-server';
 import type { Store } from '../store.ts';
 import { init } from './store.ts';
 import { storeSchema } from './store.zod.ts';
