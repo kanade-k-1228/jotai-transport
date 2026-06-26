@@ -4,29 +4,40 @@
 
 ## 構成
 
-- `pkgs/jotai-transport`: Jotai atom を WebSocket に同期する公開パッケージ
-- `pkgs/transport-server`: JSON patch を検証してブロードキャストする公開パッケージ
-- `example`: 上記2パッケージを使う Vite + React + tsx のサンプルアプリ
+リポジトリルートに pnpm workspace は持たず、各ディレクトリが独立してインストール・ビルドできます。
+
+- `pkgs/client`: Jotai atom を WebSocket に同期する npm パッケージ（npm 名 `jotai-transport`）
+- `pkgs/server`: WebSocket でストアを同期する Rust crate（Cargo 名 `jotai-transport`）。プロトコルを担い、`Atom` トレイトと `store!` マクロでストアを組み立てます
+- `example/client`: `jotai-transport`（npm）を使う Vite + React のサンプル（3つの LED を on/off するUI）
+- `example/server`: 上記 Rust crate を使い、Raspberry Pi の GPIO LED を駆動する Rust サーバ（CLI は clap。`example/server/README.md` 参照）
 
 ## 開発
 
-```sh
-pnpm install
-pnpm dev
-```
-
-`pnpm dev` は公開パッケージを先にビルドしてから、example の WebSocket サーバと Vite クライアントを起動します。別々に起動したい場合は次を使います。
+クライアントライブラリをビルドします（`example/client` は `file:` 依存でこのビルド成果物を参照します）。
 
 ```sh
-pnpm server
-pnpm client
+( cd pkgs/client && pnpm install && pnpm build )
 ```
+
+サンプルを起動します。サーバ（Rust）とクライアント（Vite）を別々に起動します。サーバは
+`transport-server` crate を path 依存で取り込むため、`cargo run` だけでビルドされます。
+
+```sh
+# サーバ（Pi 以外では自動で mock モードになり LED 状態をログ出力）
+( cd example/server && cargo run )
+
+# クライアント（別ターミナル）
+( cd example/client && pnpm install && pnpm dev )
+```
+
+Vite は `/ws` を `ws://localhost:8137` のサーバへプロキシします。Raspberry Pi 実機で動かす場合は
+`SERVER_HOST=<PiのIP>` を付けて `pnpm dev` を起動します。
 
 検証:
 
 ```sh
-pnpm build
-pnpm check
+( cd example/client && pnpm typecheck && pnpm build )
+( cd example/server && cargo build )
 ```
 
 ## 使い方
@@ -59,31 +70,40 @@ export const statusAtom = transport.statusAtom();
 受信更新は microtask 単位でまとめられ、キーごとに最新値だけが反映される（高頻度更新で jotai 再計算・
 再描画を削減。同一ティック内の中間値は反映されない）。
 
-サーバ側:
+サーバ側（Rust crate `transport-server`）:
 
-```ts
-import { createTransportServer } from 'transport-server';
-import { z } from 'zod';
+キーごとに `Atom` トレイト（値の `get` / `set`）を実装し、`store!` マクロで `Store`（キーは構築時に確定）を組み立てて `serve` を呼びます。受信メッセージは各キーの `set` に渡され、反映後のスナップショットがブロードキャストされます。
 
-interface Store {
-  count: number;
-  command: string;
+```rust
+use serde_json::Value;
+use jotai_transport::{serve, store, Atom, ServerOptions};
+
+struct Counter {
+    count: i64,
 }
 
-const init: Store = {
-  count: 0,
-  command: '',
-};
+impl Atom for Counter {
+    fn get(&self) -> Value {
+        Value::from(self.count)
+    }
 
-const storeSchema = z.object({
-  count: z.number(),
-  command: z.string(),
-});
+    fn set(&mut self, value: Value) {
+        if let Some(c) = value.as_i64() {
+            self.count = c;
+        }
+    }
+}
 
-createTransportServer(init, storeSchema, { port: 8137 });
+#[tokio::main]
+async fn main() -> Result<(), jotai_transport::BoxError> {
+    let store = store! {
+        "count" => Counter { count: 0 },
+    };
+    serve(store, ServerOptions::default()).await
+}
 ```
 
-`transport-server` は Zod に直接依存せず、`.partial().safeParse()` を持つ Zod 互換のスキーマを受け取ります。
+完全な例は `example/server`（3つの bool を GPIO LED に反映）を参照してください。
 
 ## 通信プロトコル
 
@@ -138,9 +158,8 @@ JSON としてパースできないメッセージ、または `Store` の型に
 
 ## 公開
 
-公開前に `pnpm build` を通してください。
+npm に公開するのはクライアントパッケージ `jotai-transport` のみです（`prepack` で自動ビルド）。詳細は `Publish.md` を参照してください。`pkgs/server` は Rust crate のため npm 公開対象外です。
 
 ```sh
-pnpm --filter jotai-transport publish --access public
-pnpm --filter transport-server publish --access public
+( cd pkgs/client && pnpm publish --access public )
 ```

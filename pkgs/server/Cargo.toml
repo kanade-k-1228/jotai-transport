@@ -1,0 +1,11 @@
+[package]
+name = "jotai-transport"
+version = "0.2.0"
+edition = "2021"
+description = "WebSocket server for synchronizing object state with jotai-transport (Rust)."
+
+[dependencies]
+tokio = { version = "1.40", features = ["rt-multi-thread", "macros", "net", "sync"] }
+tokio-tungstenite = "0.24"
+futures-util = "0.3"
+serde_json = "1"

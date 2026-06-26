@@ -1,0 +1,6 @@
+# Per-package pnpm config (this app installs standalone, no repo-root workspace).
+# Allow Vite's esbuild to run its install script.
+onlyBuiltDependencies:
+  - esbuild
+allowBuilds:
+  esbuild: true
