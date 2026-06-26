@@ -4,8 +4,11 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "build:lib": "pnpm --dir ../../pkgs/client install && pnpm --dir ../../pkgs/client build",
+    "predev": "pnpm run build:lib",
     "dev": "vite",
     "client": "vite",
+    "prebuild": "pnpm run build:lib",
     "build": "vite build",
     "preview": "vite preview",
     "typecheck": "tsc -p tsconfig.json --noEmit"
