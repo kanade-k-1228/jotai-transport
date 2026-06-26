@@ -18,7 +18,7 @@ mod server;
 mod store;
 
 pub use atom::Atom;
-pub use server::{serve, BoxError, ServerOptions};
+pub use server::{serve, BoxError};
 pub use store::Store;
 
 // Re-exported so downstream code can name the `Value` type used by `Atom`.

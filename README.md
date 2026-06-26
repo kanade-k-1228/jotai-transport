@@ -76,7 +76,7 @@ export const statusAtom = transport.statusAtom();
 
 ```rust
 use serde_json::Value;
-use jotai_transport::{serve, store, Atom, ServerOptions};
+use jotai_transport::{serve, store, Atom};
 
 struct Counter {
     count: i64,
@@ -99,7 +99,7 @@ async fn main() -> Result<(), jotai_transport::BoxError> {
     let store = store! {
         "count" => Counter { count: 0 },
     };
-    serve(store, ServerOptions::default()).await
+    serve(store, "0.0.0.0", 8137).await
 }
 ```
 

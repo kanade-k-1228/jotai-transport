@@ -13,7 +13,7 @@ implement the [`Atom`] trait and assemble a [`Store`].
 - `src/atom.rs` — the `Atom` trait (`get` / `set` a single value as JSON).
 - `src/store.rs` — `Store`, a fixed `HashMap<String, Box<dyn Atom>>` with `get` /
   `set` plus `snapshot` / `apply` for the wire protocol, and the `store!` macro.
-- `src/server.rs` — `serve` and `ServerOptions` (the WebSocket server).
+- `src/server.rs` — `serve` (the WebSocket server).
 - `src/lib.rs` — module declarations and re-exports.
 
 ## Protocol
@@ -40,7 +40,7 @@ Implement [`Atom`] for each value, declare the [`Store`] with the [`store!`] mac
 
 ```rust
 use serde_json::Value;
-use jotai_transport::{serve, store, Atom, ServerOptions};
+use jotai_transport::{serve, store, Atom};
 
 struct Counter {
     count: i64,
@@ -63,7 +63,7 @@ async fn main() -> Result<(), jotai_transport::BoxError> {
     let store = store! {
         "count" => Counter { count: 0 },
     };
-    serve(store, ServerOptions::default()).await
+    serve(store, "0.0.0.0", 8137).await
 }
 ```
 

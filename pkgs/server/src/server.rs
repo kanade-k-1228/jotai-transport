@@ -10,31 +10,15 @@ use crate::Store;
 
 pub type BoxError = Box<dyn std::error::Error + Send + Sync>;
 
-/// Listener configuration.
-#[derive(Clone, Debug)]
-pub struct ServerOptions {
-    pub host: String,
-    pub port: u16,
-}
-
-impl Default for ServerOptions {
-    fn default() -> Self {
-        ServerOptions {
-            host: "0.0.0.0".to_string(),
-            port: 8137,
-        }
-    }
-}
-
 /// Run the transport server, accepting connections until the listener fails.
-pub async fn serve(store: Store, options: ServerOptions) -> Result<(), BoxError> {
+pub async fn serve(store: Store, host: &str, port: u16) -> Result<(), BoxError> {
     let store = Arc::new(Mutex::new(store));
 
     // Outbound fan-out. subscribe() keeps working with zero live receivers, so we
     // don't need to hold on to the initial one.
     let (tx, _) = broadcast::channel::<String>(64);
 
-    let addr = format!("{}:{}", options.host, options.port);
+    let addr = format!("{host}:{port}");
     let listener = TcpListener::bind(&addr).await?;
     println!("[transport] listening on ws://{addr}");
 
