@@ -9,7 +9,7 @@
 //!   * on connect    -> the server sends [`Store::snapshot`] once
 //!   * client -> srv -> a partial `{ "key": value }` JSON text message
 //!   * srv -> clients -> after merging, the new snapshot is broadcast to every
-//!                       connected client (including the sender)
+//!     connected client (including the sender)
 //!
 //! A message that is not a JSON object is silently ignored, with no error response.
 
