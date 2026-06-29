@@ -3,6 +3,11 @@ name = "jotai-transport"
 version = "0.2.0"
 edition = "2021"
 description = "WebSocket server for synchronizing object state with jotai-transport (Rust)."
+license = "Apache-2.0"
+repository = "https://github.com/kanade-k-1228/jotai-transport"
+readme = "README.md"
+keywords = ["jotai", "websocket", "state", "sync"]
+categories = ["web-programming::websocket", "network-programming"]
 
 [dependencies]
 tokio = { version = "1.40", features = ["rt-multi-thread", "macros", "net", "sync"] }
