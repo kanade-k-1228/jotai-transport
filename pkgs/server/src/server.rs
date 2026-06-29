@@ -51,7 +51,10 @@ async fn handle_conn(
 
     // Subscribe before reading the snapshot so no update is lost in between.
     let mut rx = tx.subscribe();
-    println!("[transport {peer}] connected (clients: {})", tx.receiver_count());
+    println!(
+        "[transport {peer}] connected (clients: {})",
+        tx.receiver_count()
+    );
 
     // Send the current full store as the initial snapshot.
     let snapshot = store.lock().unwrap().snapshot();
