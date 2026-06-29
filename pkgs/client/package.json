@@ -1,0 +1,52 @@
+{
+  "name": "jotai-transport",
+  "version": "0.2.0",
+  "description": "Jotai atoms synchronized over a WebSocket transport.",
+  "license": "Apache-2.0",
+  "author": "kanade-k-1228",
+  "homepage": "https://github.com/kanade-k-1228/jotai-transport#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kanade-k-1228/jotai-transport.git"
+  },
+  "bugs": {
+    "url": "https://github.com/kanade-k-1228/jotai-transport/issues"
+  },
+  "keywords": [
+    "jotai",
+    "websocket",
+    "state",
+    "sync",
+    "transport"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "prepack": "pnpm run build"
+  },
+  "peerDependencies": {
+    "jotai": "^2.0.0"
+  },
+  "devDependencies": {
+    "jotai": "^2.10.0",
+    "typescript": "^5.6.2"
+  }
+}
