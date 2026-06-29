@@ -1,6 +1,6 @@
 {
   "name": "jotai-transport",
-  "version": "0.2.0",
+  "version": "0.3.0-dev",
   "description": "Jotai atoms synchronized over a WebSocket transport.",
   "license": "Apache-2.0",
   "author": "kanade-k-1228",

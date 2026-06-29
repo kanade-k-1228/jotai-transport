@@ -1,6 +1,6 @@
 [package]
-name = "rgb-led-server"
-version = "0.1.0"
+name = "jotai-transport-example"
+version = "0.3.0-dev"
 edition = "2021"
 description = "jotai-transport server that drives 3 GPIO LEDs on a Raspberry Pi"
 
