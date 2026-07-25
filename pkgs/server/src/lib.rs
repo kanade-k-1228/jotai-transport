@@ -1,25 +1,34 @@
-//! WebSocket server for synchronizing a single object store with `jotai-transport`.
+//! WebSocket server for synchronizing a single object store with jotai clients.
 //!
-//! This crate owns the wire protocol; you own the atoms. Build a [`Store`] from
-//! your own [`Atom`] implementations (the [`store!`] macro is the easy way) and
-//! call [`serve`].
+//! # Value model
 //!
-//! Protocol (identical to the `jotai-transport` client):
+//! Every value flowing through [`Atom`] and [`Store`] is a crate-owned [`Value`],
+//! regardless of the messaging format in use. It implements `Serialize` and
+//! `Deserialize`, so any self-describing serde format encodes it directly; the
+//! format is swapped at the encoding boundary only, by a [`Codec`].
 //!
-//!   * on connect    -> the server sends [`Store::snapshot`] once
-//!   * client -> srv -> a partial `{ "key": value }` JSON text message
-//!   * srv -> clients -> after merging, the new snapshot is broadcast to every
-//!     connected client (including the sender)
-//!
-//! A message that is not a JSON object is silently ignored, with no error response.
+//! [`Value`] is the JSON data model, so it deliberately has no byte-string
+//! variant even though CBOR and MessagePack have one: the peer is a browser
+//! client whose values are JSON's, and nothing there could receive it.
 
 mod atom;
+mod codec;
 mod server;
 mod store;
+mod value;
 
 pub use atom::Atom;
-pub use server::{serve, BoxError};
+pub use codec::{Codec, Frame};
+pub use server::{serve_with_codec, BoxError};
 pub use store::Store;
+pub use value::{Object, Value};
 
-// Re-exported so downstream code can name the `Value` type used by `Atom`.
-pub use serde_json;
+#[cfg(feature = "json")]
+pub use codec::JsonCodec;
+#[cfg(feature = "json")]
+pub use server::serve;
+
+#[cfg(feature = "cbor")]
+pub use codec::CborCodec;
+#[cfg(feature = "msgpack")]
+pub use codec::MsgpackCodec;

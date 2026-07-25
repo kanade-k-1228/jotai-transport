@@ -1,41 +1,52 @@
+use std::cell::RefCell;
+
 use rppal::gpio::{Gpio, OutputPin};
-use serde_json::Value;
-use transport_server::Atom;
+use transport_server::{Atom, BoxError, Value};
 
 pub struct LedAtom {
-    value: bool,
-    pin: Option<OutputPin>,
+    value: Option<bool>,
+    pin: Option<RefCell<OutputPin>>,
 }
 
 impl LedAtom {
     pub fn new(gpio: Option<&Gpio>, pin_num: u8) -> Self {
         let pin = gpio
             .and_then(|g| g.get(pin_num).ok())
-            .map(|pin| pin.into_output());
-        let mut atom = Self { value: false, pin };
-        atom.write(false); // ensure the LED starts off
-        atom
-    }
-
-    fn write(&mut self, value: bool) {
-        self.value = value;
-        if let Some(pin) = &mut self.pin {
-            match value {
-                true => pin.set_high(),
-                false => pin.set_low(),
-            }
+            .map(|pin| RefCell::new(pin.into_output()));
+        let mut atom = Self { value: None, pin };
+        atom.commit(Value::Bool(false)); // ensure the LED starts off
+        if let Err(e) = atom.persist(&Value::Bool(false)) {
+            eprintln!("[led] init persist failed: {e}");
         }
+        atom
     }
 }
 
 impl Atom for LedAtom {
-    fn get(&self) -> Value {
-        Value::Bool(self.value)
+    fn value(&self) -> Option<Value> {
+        self.value.map(Value::Bool)
     }
 
-    fn set(&mut self, value: Value) {
+    fn commit(&mut self, value: Value) {
         if let Value::Bool(v) = value {
-            self.write(v);
+            self.value = Some(v);
         }
+    }
+
+    fn parse(&self, raw: &Value) -> Option<Value> {
+        raw.as_bool().map(Value::Bool)
+    }
+
+    fn persist(&self, value: &Value) -> Result<(), BoxError> {
+        let Some(on) = value.as_bool() else {
+            return Ok(());
+        };
+        if let Some(pin) = &self.pin {
+            match on {
+                true => pin.borrow_mut().set_high(),
+                false => pin.borrow_mut().set_low(),
+            }
+        }
+        Ok(())
     }
 }

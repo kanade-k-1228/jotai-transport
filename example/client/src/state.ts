@@ -1,15 +1,9 @@
 import { createTransport } from 'jotai-transport';
 
-export interface Store {
-  red: boolean;
-  yellow: boolean;
-  green: boolean;
-}
-
-const transport = createTransport<Store>({ url: `ws://${location.host}/ws` });
+const transport = createTransport(`ws://${location.host}/ws`);
 
 export const statusAtom = transport.statusAtom();
 
-export const redAtom =  transport.atom('red');
-export const yellowAtom =  transport.atom('yellow');
-export const greenAtom =  transport.atom('green');
+export const redAtom = transport.atom<boolean>('red');
+export const yellowAtom = transport.atom<boolean>('yellow');
+export const greenAtom = transport.atom<boolean>('green');

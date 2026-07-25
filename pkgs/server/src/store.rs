@@ -1,21 +1,13 @@
 use std::collections::HashMap;
 
-use serde_json::{Map, Value};
-
 use crate::atom::Atom;
+use crate::value::{Object, Value};
 
-/// A fixed set of [`Atom`]s addressed by string keys, serialized as a JSON object.
-///
-/// The keys and atoms are decided once at construction — there is no `insert`.
-/// Build one with the [`store!`](crate::store) macro (or [`Store::from_atoms`]).
-/// `get`/`set` then read and update existing atoms; unknown keys are ignored.
 pub struct Store {
     atoms: HashMap<String, Box<dyn Atom>>,
 }
 
 impl Store {
-    /// Build a store from its complete, fixed set of atoms. Prefer the
-    /// [`store!`](crate::store) macro for a concise literal.
     pub fn from_atoms<I>(atoms: I) -> Self
     where
         I: IntoIterator<Item = (String, Box<dyn Atom>)>,
@@ -25,60 +17,50 @@ impl Store {
         }
     }
 
-    /// Current value of `key`, or `None` if no such atom is registered.
     pub fn get(&self, key: &str) -> Option<Value> {
-        self.atoms.get(key).map(|atom| atom.get())
+        self.atoms.get(key)?.value()
     }
 
-    /// Update `key` if it exists; unknown keys are ignored.
-    pub fn set(&mut self, key: &str, value: Value) {
-        if let Some(atom) = self.atoms.get_mut(key) {
-            atom.set(value);
-        }
-    }
-
-    /// The full store as a JSON object string. Sent to each client on connect
-    /// and used as the broadcast payload after an update.
-    pub fn snapshot(&self) -> String {
-        let map: Map<String, Value> = self
-            .atoms
+    pub fn snapshot(&self) -> Object {
+        self.atoms
             .iter()
-            .map(|(key, atom)| (key.clone(), atom.get()))
-            .collect();
-        Value::Object(map).to_string()
+            .filter_map(|(key, atom)| atom.value().map(|v| (key.clone(), v)))
+            .collect()
     }
 
-    /// Apply a partial-update message (`{ "key": value, ... }`): set each present
-    /// key, then return the new snapshot to broadcast. Returns `None` when the
-    /// message is not a JSON object, so it is ignored.
-    pub fn apply(&mut self, message: &str) -> Option<String> {
-        let Ok(Value::Object(map)) = serde_json::from_str::<Value>(message) else {
-            return None;
-        };
-        for (key, value) in map {
-            self.set(&key, value);
+    pub fn update(&mut self, partial: Object) -> Object {
+        let mut accepted = Object::new();
+        for (key, raw) in partial {
+            let Some(atom) = self.atoms.get_mut(&key) else {
+                continue;
+            };
+            let Some(value) = atom.parse(&raw) else {
+                continue;
+            };
+            if let Err(e) = atom.persist(&value) {
+                eprintln!("[store] persist failed for {key}: {e}");
+            }
+            atom.commit(value.clone());
+            accepted.insert(key, value);
         }
-        Some(self.snapshot())
+        accepted
+    }
+
+    pub fn refresh(&mut self) -> Object {
+        let mut changed = Object::new();
+        for (key, atom) in self.atoms.iter_mut() {
+            let Some(value) = atom.load() else {
+                continue;
+            };
+            if atom.value().as_ref() != Some(&value) {
+                atom.commit(value.clone());
+                changed.insert(key.clone(), value);
+            }
+        }
+        changed
     }
 }
 
-/// Build a [`Store`] from a fixed set of `key => atom` pairs.
-///
-/// ```
-/// use jotai_transport::serde_json::Value;
-/// use jotai_transport::{store, Atom};
-///
-/// struct Flag(bool);
-/// impl Atom for Flag {
-///     fn get(&self) -> Value { Value::Bool(self.0) }
-///     fn set(&mut self, v: Value) { if let Value::Bool(b) = v { self.0 = b; } }
-/// }
-///
-/// let store = store! {
-///     "power" => Flag(false),
-///     "ready" => Flag(true),
-/// };
-/// ```
 #[macro_export]
 macro_rules! store {
     ($($key:expr => $atom:expr),* $(,)?) => {
@@ -91,4 +73,175 @@ macro_rules! store {
             ),*
         ])
     };
+}
+
+#[cfg(test)]
+mod tests {
+    use std::cell::RefCell;
+
+    use super::*;
+    use crate::BoxError;
+
+    fn object<const N: usize>(entries: [(&str, Value); N]) -> Object {
+        entries
+            .into_iter()
+            .map(|(key, value)| (key.to_owned(), value))
+            .collect()
+    }
+
+    #[derive(Default)]
+    struct Cell {
+        value: Option<Value>,
+        external: Option<Value>,
+        persisted: RefCell<Vec<Value>>,
+        persist_fails: bool,
+    }
+
+    impl Cell {
+        fn holding(value: Value) -> Self {
+            Cell {
+                value: Some(value),
+                ..Cell::default()
+            }
+        }
+
+        fn backed_by(value: Value, external: Value) -> Self {
+            Cell {
+                value: Some(value),
+                external: Some(external),
+                ..Cell::default()
+            }
+        }
+    }
+
+    impl Atom for Cell {
+        fn value(&self) -> Option<Value> {
+            self.value.clone()
+        }
+
+        fn commit(&mut self, value: Value) {
+            self.value = Some(value);
+        }
+
+        /// Integers only, so a rejected write is reachable from a test.
+        fn parse(&self, raw: &Value) -> Option<Value> {
+            raw.as_i64().map(Value::Int)
+        }
+
+        fn load(&self) -> Option<Value> {
+            self.external.clone()
+        }
+
+        fn persist(&self, value: &Value) -> Result<(), BoxError> {
+            self.persisted.borrow_mut().push(value.clone());
+            if self.persist_fails {
+                return Err("backing store unavailable".into());
+            }
+            Ok(())
+        }
+    }
+
+    /// No `parse` override, so `Atom`'s default makes it read-only.
+    struct ReadOnly(Value);
+
+    impl Atom for ReadOnly {
+        fn value(&self) -> Option<Value> {
+            Some(self.0.clone())
+        }
+
+        fn commit(&mut self, value: Value) {
+            self.0 = value;
+        }
+    }
+
+    #[test]
+    fn snapshot_and_get_omit_atoms_with_no_value_yet() {
+        let store = crate::store! {
+            "ready" => Cell::holding(Value::Int(1)),
+            "pending" => Cell::default(),
+        };
+
+        assert_eq!(store.snapshot(), object([("ready", Value::Int(1))]));
+        assert_eq!(store.get("ready"), Some(Value::Int(1)));
+        assert_eq!(store.get("pending"), None);
+        assert_eq!(store.get("absent"), None);
+    }
+
+    #[test]
+    fn update_commits_and_returns_only_accepted_keys() {
+        let mut store = crate::store! { "count" => Cell::holding(Value::Int(0)) };
+
+        let accepted = store.update(object([
+            ("count", Value::Int(7)),
+            ("absent", Value::Int(1)),
+        ]));
+
+        assert_eq!(accepted, object([("count", Value::Int(7))]));
+        assert_eq!(store.get("count"), Some(Value::Int(7)));
+    }
+
+    #[test]
+    fn update_drops_values_the_atom_will_not_parse() {
+        let mut store = crate::store! { "count" => Cell::holding(Value::Int(0)) };
+
+        let accepted = store.update(object([("count", Value::Str("seven".into()))]));
+
+        assert!(accepted.is_empty());
+        assert_eq!(store.get("count"), Some(Value::Int(0)));
+    }
+
+    #[test]
+    fn a_read_only_atom_rejects_every_write() {
+        let mut store = crate::store! { "version" => ReadOnly(Value::Str("1.0".into())) };
+
+        let accepted = store.update(object([("version", Value::Str("2.0".into()))]));
+
+        assert!(accepted.is_empty());
+        assert_eq!(store.get("version"), Some(Value::Str("1.0".into())));
+    }
+
+    #[test]
+    fn update_commits_even_when_persist_fails() {
+        // The write is still the client's intent, and dropping it would leave
+        // that client showing a value the server does not have.
+        let mut store = crate::store! {
+            "count" => Cell { value: Some(Value::Int(0)), persist_fails: true, ..Cell::default() }
+        };
+
+        let accepted = store.update(object([("count", Value::Int(7))]));
+
+        assert_eq!(accepted, object([("count", Value::Int(7))]));
+        assert_eq!(store.get("count"), Some(Value::Int(7)));
+    }
+
+    #[test]
+    fn refresh_reports_and_commits_a_changed_backing_value() {
+        let mut store = crate::store! {
+            "sensor" => Cell::backed_by(Value::Int(1), Value::Int(2)),
+        };
+
+        assert_eq!(store.refresh(), object([("sensor", Value::Int(2))]));
+        assert_eq!(store.get("sensor"), Some(Value::Int(2)));
+        // Second pass: the backing value now matches, so nothing is broadcast.
+        assert!(store.refresh().is_empty());
+    }
+
+    #[test]
+    fn refresh_ignores_atoms_with_no_backing_store() {
+        let mut store = crate::store! { "count" => Cell::holding(Value::Int(1)) };
+
+        assert!(store.refresh().is_empty());
+    }
+
+    /// The change check runs on `Value`'s `PartialEq`, which compares integers
+    /// across the `Int`/`Uint` split. If it did not, an atom whose backing
+    /// store hands back a `Uint` would look changed on every single tick.
+    #[test]
+    fn refresh_treats_int_and_uint_as_the_same_value() {
+        let mut store = crate::store! {
+            "count" => Cell::backed_by(Value::Int(7), Value::Uint(7)),
+        };
+
+        assert!(store.refresh().is_empty());
+    }
 }

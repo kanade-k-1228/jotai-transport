@@ -46,12 +46,12 @@ body {
   box-shadow: 0 0 8px 2px #ffd740;
 }
 
-.conn-open .conn-dot {
+.conn-connected .conn-dot {
   background: #69f0ae;
   box-shadow: 0 0 8px 2px #69f0ae;
 }
 
-.conn-closed .conn-dot {
+.conn-disconnected .conn-dot {
   background: #ff5252;
   box-shadow: 0 0 8px 2px #ff5252;
 }
